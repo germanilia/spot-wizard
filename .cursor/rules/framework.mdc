@@ -1,0 +1,60 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+This will use reac + shadcn for ui and fastapi for the backend.
+The backend needs to serve the client it will run in a single container.
+
+no need for a db, the secrets will be loaded from .env file.
+
+This application should provide information about spot instances on AWS, it will be able to provide general information and help planing
+the bes destribution by instance types / regions. the customer will be able to provide a list of instances and the applicatoin will show
+the best region to run the instances on and suggest alternatives (like different combination of instance types)
+
+The application will allow adding access key and and secret key with read only permissions to pull the current 
+instance ec2 instances in an account and suggest better spot allocation / informatoin about interruption rate for these instances
+/ the suggested cost saving if will switch from on demand to spot.
+
+The UI needs to use shadcn and be friendly and intuative.
+
+The instances json will be feteched from:
+https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json
+
+and this is the structure:
+lass InstanceType(BaseModel):
+    emr: bool
+    cores: int
+    ram_gb: float
+
+
+class Range(BaseModel):
+    index: int
+    label: str
+    dots: int
+    max: int
+
+
+class SpotMetrics(BaseModel):
+    s: int  # Score
+    r: int  # Rating
+
+
+class InstanceSpotData(BaseModel):
+    Linux: Dict[str, SpotMetrics]
+    Windows: Optional[Dict[str, SpotMetrics]] = None
+
+
+class RegionSpotData(BaseModel):
+    __root__: Dict[str, InstanceSpotData]
+
+
+class SpotData(BaseModel):
+    instance_types: Dict[str, InstanceType]
+    ranges: List[Range]
+    spot_advisor: Dict[str, RegionSpotData] 
+
+
