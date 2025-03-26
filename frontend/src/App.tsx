@@ -11,10 +11,9 @@ import { spotStore } from './store/spotStore';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OSSelector } from './components/OSSelector';
-import { ChevronDown, ChevronUp, AlertCircle, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InstanceQuantityManager } from './components/InstanceQuantityManager';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 type ViewType = 'instance' | 'region' | 'stack';
 
@@ -112,50 +111,8 @@ function App() {
             </TabsContent>
 
             <TabsContent value="calculator" className="mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <JsonImportInput onImportComplete={handleAnalyze} />
-                </div>
-                <div>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Calculator Import</CardTitle>
-                      <CardDescription>
-                        Import your EC2 instances from an AWS Pricing Calculator JSON file.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <p>
-                        Upload a JSON file exported from the AWS Pricing Calculator to import your EC2 instances.
-                        We'll analyze them for potential cost savings with spot instances.
-                      </p>
-                      <p>
-                        The file should be in the format exported by the AWS Pricing Calculator.
-                        We'll extract the instance types, regions, and quantities automatically.
-                      </p>
-                      
-                      {spotStore.error && (
-                        <Alert variant="destructive">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>{spotStore.error}</AlertDescription>
-                        </Alert>
-                      )}
-                      
-                      {selectedInstances.length > 0 && selectedRegions.length > 0 && (
-                        <div className="pt-4">
-                          <Button 
-                            onClick={handleAnalyze} 
-                            disabled={spotStore.isLoading}
-                            className="w-full"
-                          >
-                            {spotStore.isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {spotStore.isLoading ? 'Analyzing...' : 'Analyze Selected Instances'}
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+              <div>
+                <JsonImportInput onImportComplete={handleAnalyze} />
               </div>
             </TabsContent>
           </Tabs>
