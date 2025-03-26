@@ -1,5 +1,5 @@
 import { proxy } from 'valtio';
-import { InstanceAnalysis, RegionAnalysis, StackAnalysis, PricingConfig, RegionCode } from '../types/spot';
+import { InstanceAnalysis, RegionAnalysis, StackAnalysis, PricingConfig, RegionCode, InstanceQuantityConfig } from '../types/spot';
 import { SpotService } from '../services/spotService';
 
 interface SpotStore {
@@ -14,6 +14,7 @@ interface SpotStore {
   error: string | null;
   pricingConfig: PricingConfig;
   analysisResults: InstanceAnalysis[] | null;
+  instanceQuantities: InstanceQuantityConfig[];
 }
 
 const spotService = SpotService.getInstance();
@@ -33,6 +34,7 @@ export const spotStore = proxy<SpotStore>({
     operatingSystem: 'Linux',
   },
   analysisResults: null,
+  instanceQuantities: [],
 });
 
 export const actions = {
@@ -80,7 +82,8 @@ export const actions = {
       console.log('Analyzing instances:', {
         selectedInstances: spotStore.selectedInstances,
         selectedRegions: spotStore.selectedRegions,
-        pricingConfig: spotStore.pricingConfig
+        pricingConfig: spotStore.pricingConfig,
+        instanceQuantities: spotStore.instanceQuantities
       });
 
       const analysis = await spotService.analyzeInstances(
@@ -91,23 +94,46 @@ export const actions = {
 
       // Check if we have any analysis results
       if (analysis.length > 0) {
-        spotStore.analysis = analysis;
-        spotStore.regionAnalysis = spotService.analyzeRegions(analysis);
-        spotStore.stackAnalysis = spotService.analyzeStacks(analysis);
-        spotStore.analysisResults = analysis;
+        console.log('Analysis results received:', analysis);
+        
+        // Force UI update by setting initial values
+        spotStore.analysis = [];
+        spotStore.regionAnalysis = [];
+        spotStore.stackAnalysis = [];
+        
+        // Small timeout to ensure the UI updates
+        setTimeout(() => {
+          try {
+            // Make sure the store updates are properly applied 
+            // Need to create new arrays to ensure reactivity
+            const copyOfAnalysis = [...analysis];
+            spotStore.analysis = copyOfAnalysis;
+            
+            // Process and set other analysis data
+            spotStore.regionAnalysis = spotService.analyzeRegions(copyOfAnalysis);
+            spotStore.stackAnalysis = spotService.analyzeStacks(copyOfAnalysis);
+            spotStore.analysisResults = copyOfAnalysis;
+            
+            console.log('Store updated with analysis:', copyOfAnalysis.length);
+          
+            // Check for unavailable regions
+            const unavailableRegions = new Set<string>();
+            copyOfAnalysis.forEach(instanceAnalysis => {
+              const unavailableRegionsForInstance = instanceAnalysis.spotMetrics
+                .filter(metric => metric.spotUnavailable)
+                .map(metric => metric.region);
+              
+              unavailableRegionsForInstance.forEach(region => unavailableRegions.add(region));
+            });
 
-        // Check for unavailable regions
-        const unavailableRegions = new Set<string>();
-        analysis.forEach(instanceAnalysis => {
-          if (instanceAnalysis.unavailableRegions) {
-            instanceAnalysis.unavailableRegions.forEach(region => unavailableRegions.add(region));
+            if (unavailableRegions.size > 0) {
+              const regionList = Array.from(unavailableRegions).join(', ');
+              spotStore.error = `Some regions have missing or incomplete pricing data (${regionList}). Showing available information for other regions.`;
+            }
+          } catch (error) {
+            console.error('Error updating store with analysis:', error);
           }
-        });
-
-        if (unavailableRegions.size > 0) {
-          const regionList = Array.from(unavailableRegions).join(', ');
-          spotStore.error = `Some regions have missing or incomplete pricing data (${regionList}). Showing available information for other regions.`;
-        }
+        }, 50);
       } else {
         spotStore.error = 'No analysis data available for the selected configuration';
       }
@@ -133,5 +159,36 @@ export const actions = {
 
   setAnalysisResults(results: InstanceAnalysis[] | null) {
     spotStore.analysisResults = results;
+  },
+
+  updateInstanceQuantity(instanceType: string, region: RegionCode, operatingSystem: 'Linux' | 'Windows', quantity: number) {
+    // Find if configuration already exists
+    const existingIndex = spotStore.instanceQuantities.findIndex(
+      item => item.instanceType === instanceType && 
+              item.region === region && 
+              item.operatingSystem === operatingSystem
+    );
+
+    // Update existing or add new configuration
+    if (existingIndex >= 0) {
+      // Create a new array to trigger reactivity
+      const newQuantities = [...spotStore.instanceQuantities];
+      newQuantities[existingIndex] = {
+        ...newQuantities[existingIndex],
+        quantity
+      };
+      spotStore.instanceQuantities = newQuantities;
+    } else {
+      spotStore.instanceQuantities.push({
+        instanceType,
+        region,
+        operatingSystem,
+        quantity
+      });
+    }
+  },
+
+  clearInstanceQuantities() {
+    spotStore.instanceQuantities = [];
   },
 }; 

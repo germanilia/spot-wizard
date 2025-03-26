@@ -159,4 +159,11 @@ export interface SpotAdvisorData {
   instance_types: {
     [instanceType: string]: InstanceSpecs;
   };
+}
+
+export interface InstanceQuantityConfig {
+  instanceType: string;
+  region: RegionCode;
+  operatingSystem: 'Linux' | 'Windows';
+  quantity: number;
 } 

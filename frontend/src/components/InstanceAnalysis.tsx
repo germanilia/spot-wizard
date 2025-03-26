@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSnapshot } from 'valtio';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -15,6 +15,8 @@ import { StackAnalysisVisual } from '@/components/StackAnalysisVisual';
 import { Loader2 } from 'lucide-react';
 import { InstanceSelector } from './InstanceSelector';
 import { RegionSelector } from './RegionSelector';
+import { InstanceQuantityManager } from './InstanceQuantityManager';
+import { OSSelector } from './OSSelector';
 import { Button } from '@/components/ui/button';
 import { actions } from '../store/spotStore';
 
@@ -581,12 +583,49 @@ function InstanceCard({ analysis }: { analysis: InstanceAnalysisType }) {
 type ViewType = 'instance' | 'region' | 'stack';
 
 export function InstanceAnalysis() {
-  const { selectedInstances, analysis, isLoading, error, regionAnalysis, stackAnalysis } = useSnapshot(spotStore);
+  const snap = useSnapshot(spotStore);
+  const { selectedInstances, isLoading, error, regionAnalysis, stackAnalysis } = snap;
+  const analysis = snap.analysis;
   const [selectedView, setSelectedView] = useState<ViewType>('instance');
   const [selectedOS, setSelectedOS] = useState<'both' | 'linux' | 'windows'>('both');
-  const { selectedRegions } = useSnapshot(spotStore);
+  const { selectedRegions } = snap;
+  const [forceRender, setForceRender] = useState(0);
+
+  // Function to trigger analysis and ensure UI updates
+  const handleAnalysis = async () => {
+    console.log("Running analysis directly...");
+    try {
+      setForceRender(prev => prev + 1);
+      await actions.analyzeInstances();
+      // Force another re-render after analysis is complete
+      setTimeout(() => {
+        setForceRender(prev => prev + 1);
+        console.log("Forced re-render after analysis");
+      }, 100);
+    } catch (error) {
+      console.error("Error running analysis:", error);
+    }
+  };
+
+  // Force re-render when analysis updates
+  useEffect(() => {
+    if (analysis && analysis.length > 0) {
+      console.log('Analysis updated, forcing re-render');
+      setForceRender(prev => prev + 1);
+    }
+  }, [analysis]);
 
   const renderContent = () => {
+    console.log("Rendering content with state:", { 
+      isLoading, 
+      error, 
+      selectedInstances: selectedInstances.length,
+      analysisLength: analysis?.length, 
+      hasResults: analysis?.length > 0,
+      forceRender,
+      firstInstanceType: analysis?.[0]?.instanceType
+    });
+
     if (isLoading) {
       return (
         <div className="flex items-center justify-center min-h-[400px] bg-background/50">
@@ -620,9 +659,10 @@ export function InstanceAnalysis() {
     }
 
     if (!analysis?.length) {
+      console.log("No analysis results found", { analysis });
       return (
         <Alert className="mt-4 bg-muted/50">
-          <AlertDescription>No analysis data available for the selected instances.</AlertDescription>
+          <AlertDescription>No analysis data available for the selected instances. Press the "Analyze Instances" button to generate the analysis.</AlertDescription>
         </Alert>
       );
     }
@@ -741,16 +781,6 @@ export function InstanceAnalysis() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Select value={selectedOS} onValueChange={(value: 'both' | 'linux' | 'windows') => setSelectedOS(value)}>
-                <SelectTrigger className="w-[200px] h-11 text-lg font-medium bg-primary/5 border-2 border-primary/20 hover:bg-primary/10 transition-colors">
-                  <SelectValue placeholder="Select OS" />
-                </SelectTrigger>
-                <SelectContent className="w-[200px]">
-                  <SelectItem value="both" className="text-base py-3">Both OS</SelectItem>
-                  <SelectItem value="linux" className="text-base py-3">Linux Only</SelectItem>
-                  <SelectItem value="windows" className="text-base py-3">Windows Only</SelectItem>
-                </SelectContent>
-              </Select>
               <Select value={selectedView} onValueChange={(value: ViewType) => setSelectedView(value)}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Select view" />
@@ -773,12 +803,23 @@ export function InstanceAnalysis() {
           {/* Analyze Button */}
           <div className="flex items-center gap-4">
             <Button 
-              onClick={() => actions.analyzeInstances()}
-              disabled={selectedInstances.length === 0 || selectedRegions.length === 0}
+              onClick={handleAnalysis}
+              disabled={selectedInstances.length === 0 || selectedRegions.length === 0 || isLoading}
               className="bg-primary hover:bg-primary/90"
             >
-              Analyze Instances
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                'Analyze Instances'
+              )}
             </Button>
+            <OSSelector 
+              activeOS={selectedOS === 'both' ? 'Both' : selectedOS === 'linux' ? 'Linux' : 'Windows'} 
+              onChange={(os) => setSelectedOS(os === 'Both' ? 'both' : os.toLowerCase() as 'linux' | 'windows')} 
+            />
             {(selectedInstances.length === 0 || selectedRegions.length === 0) && (
               <Alert variant="destructive" className="flex-1 py-2 border-none bg-transparent">
                 <div className="flex items-center gap-2 text-destructive">
@@ -794,7 +835,10 @@ export function InstanceAnalysis() {
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-auto">
-        <div className="container mx-auto py-6">
+        <div className="container mx-auto py-6 space-y-6">
+          {/* Instance Quantity Manager */}
+          <InstanceQuantityManager className="sticky top-[5.5rem] z-10" />
+          
           {renderContent()}
         </div>
       </div>

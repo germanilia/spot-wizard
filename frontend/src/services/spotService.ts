@@ -1,6 +1,7 @@
-import { SpotData, InstanceAnalysis, InstanceSpotData, RegionAnalysis, StackAnalysis, InstanceCost, PricingConfig, SpotMetrics, RegionCode } from '../types/spot';
+import { SpotData, InstanceAnalysis, InstanceSpotData, RegionAnalysis, StackAnalysis, InstanceCost, PricingConfig, SpotMetrics, RegionCode, InstanceQuantityConfig } from '../types/spot';
 import { PricingService } from './pricingService';
 import { getSpotAdvisorCode, isValidRegionCode } from '@/lib/regionMapping';
+import { spotStore } from '../store/spotStore';
 
 const SPOT_DATA_URL = 'https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json';
 
@@ -188,6 +189,19 @@ export class SpotService {
       throw new Error('Spot data not initialized');
     }
 
+    // Get instance quantities from the store
+    const { instanceQuantities } = spotStore;
+
+    // Helper function to get quantity for an instance in a region with specific OS
+    const getQuantity = (instanceType: string, region: string, os: 'Linux' | 'Windows'): number => {
+      const config = instanceQuantities.find(
+        item => item.instanceType === instanceType && 
+                item.region === region && 
+                item.operatingSystem === os
+      );
+      return config?.quantity || 1; // Default to 1 if not configured
+    };
+
     // Track regions with available pricing data
     const availableRegions = new Set<string>();
     const unavailableRegions = new Set<string>();
@@ -215,6 +229,38 @@ export class SpotService {
       throw new Error('No pricing data available for any selected region');
     }
 
+    // Calculate instance cost with quantity
+    const calculateInstanceCostWithQuantity = (
+      instanceType: string, 
+      region: string, 
+      pricingConfig: PricingConfig
+    ): { linux: InstanceCost; windows?: InstanceCost } => {
+      const baseCosts = this.calculateInstanceCost(instanceType, region, pricingConfig);
+      const linuxQuantity = getQuantity(instanceType, region, 'Linux');
+      const windowsQuantity = getQuantity(instanceType, region, 'Windows');
+      
+      // Multiply costs by quantity
+      const result: { linux: InstanceCost; windows?: InstanceCost } = {
+        linux: {
+          ...baseCosts.linux,
+          onDemand: baseCosts.linux.onDemand * linuxQuantity,
+          spot: baseCosts.linux.spot * linuxQuantity,
+          savings: baseCosts.linux.savings * linuxQuantity
+        }
+      };
+      
+      if (baseCosts.windows) {
+        result.windows = {
+          ...baseCosts.windows,
+          onDemand: baseCosts.windows.onDemand * windowsQuantity,
+          spot: baseCosts.windows.spot * windowsQuantity,
+          savings: baseCosts.windows.savings * windowsQuantity
+        };
+      }
+      
+      return result;
+    };
+
     const spotData = this.spotData;
     
     try {
@@ -238,48 +284,61 @@ export class SpotService {
             if (process.env.NODE_ENV === 'development') {
               console.debug(`Region ${region} not found in spot data`);
             }
+            const costData = calculateInstanceCostWithQuantity(instanceType, region, pricingConfig);
             return {
               region,
               metrics: this.getDefaultMetrics(),
-              cost: this.calculateInstanceCost(instanceType, region, pricingConfig).linux,
-              windowsCost: this.calculateInstanceCost(instanceType, region, pricingConfig).windows
+              cost: costData.linux,
+              windowsCost: costData.windows,
+              spotUnavailable: true
             };
           }
 
           const linuxMetrics = regionData.Linux?.[instanceType];
           const windowsMetrics = regionData.Windows?.[instanceType];
 
-          if (!linuxMetrics) {
-            if (process.env.NODE_ENV === 'development') {
-              console.debug(`No spot metrics found for ${instanceType} in ${region}`);
-            }
-            return {
-              region,
-              metrics: this.getDefaultMetrics(),
-              cost: this.calculateInstanceCost(instanceType, region, pricingConfig).linux,
-              windowsCost: this.calculateInstanceCost(instanceType, region, pricingConfig).windows,
-              spotUnavailable: true
+          let metrics: SpotMetrics;
+          if (linuxMetrics) {
+            metrics = {
+              ...linuxMetrics,
+              interruptionFrequency: this.getInterruptionFrequency(linuxMetrics.r, 'Linux')
+            };
+          } else {
+            metrics = this.getDefaultMetrics();
+          }
+
+          // Use Windows metrics if Linux is not available
+          let windowsMetricsWithFrequency: SpotMetrics | undefined;
+          if (windowsMetrics) {
+            windowsMetricsWithFrequency = {
+              ...windowsMetrics,
+              interruptionFrequency: this.getInterruptionFrequency(windowsMetrics.r, 'Windows')
             };
           }
 
-          const costs = this.calculateInstanceCost(instanceType, region, pricingConfig);
+          const { linux: cost, windows: windowsCost } = calculateInstanceCostWithQuantity(instanceType, region, pricingConfig);
 
-          return {
+          const result = {
             region,
-            metrics: {
-              ...linuxMetrics,
-              interruptionFrequency: this.getInterruptionFrequency(linuxMetrics.r, 'Linux')
-            },
-            windowsMetrics: windowsMetrics ? {
-              ...windowsMetrics,
-              interruptionFrequency: this.getInterruptionFrequency(windowsMetrics.r, 'Windows')
-            } : undefined,
-            cost: costs.linux,
-            windowsCost: costs.windows
+            metrics,
+            cost,
+            windowsCost,
+            spotUnavailable: !linuxMetrics
           };
+
+          if (windowsMetricsWithFrequency) {
+            return {
+              ...result,
+              windowsMetrics: windowsMetricsWithFrequency
+            };
+          }
+
+          return result;
         });
 
-        const availableSpotMetrics = spotMetrics.filter(m => !m.spotUnavailable);
+        const availableSpotMetrics = spotMetrics.filter(metric => {
+          return !metric.spotUnavailable;
+        });
         const totalCost = spotMetrics.reduce(
           (acc, curr) => {
             const linuxCost = curr.cost;
