@@ -47,7 +47,7 @@ export function InstanceSelector() {
   }, [instanceTypes]);
 
   const handleSelectAll = () => {
-    actions.setSelectedInstances(instanceTypes);
+    actions.setSelectedInstances([...instanceTypes]);
   };
 
   const handleClearAll = () => {
