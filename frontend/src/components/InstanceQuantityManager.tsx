@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSnapshot } from 'valtio';
 import { spotStore, actions } from '../store/spotStore';
 import { Card, CardContent, CardFooter, CardTitle, CardHeader } from '@/components/ui/card';
@@ -23,6 +23,8 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
   const [activeRegion, setActiveRegion] = useState<RegionCode | ''>('');
   // Start with the UI expanded by default
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // Track if user has manually selected a region
+  const userSelectedRegion = useRef(false);
 
   // Initialize with currently selected region or first available region
   useEffect(() => {
@@ -30,6 +32,29 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
       setActiveRegion(selectedRegions[0]);
     }
   }, [selectedRegions, activeRegion]);
+
+  // When region changes, make sure all instances are initialized for that region
+  useEffect(() => {
+    if (!activeRegion || selectedInstances.length === 0) return;
+    
+    // Initialize any missing quantities for the newly selected region
+    selectedInstances.forEach(instanceType => {
+      const key = `${instanceType}-${activeRegion}-${activeOS}`;
+      if (!instanceQuantityMap[key]) {
+        // Check if this instance-region-OS combination already has a quantity in the store
+        const existingConfig = instanceQuantities.find(
+          q => q.instanceType === instanceType && 
+              q.region === activeRegion && 
+              q.operatingSystem === activeOS
+        );
+        
+        if (!existingConfig) {
+          // If no quantity exists yet, initialize with 1
+          actions.updateInstanceQuantity(instanceType, activeRegion as RegionCode, activeOS, 1);
+        }
+      }
+    });
+  }, [activeRegion, activeOS, selectedInstances, instanceQuantityMap, instanceQuantities]);
 
   // Always expand the UI when quantities are imported
   useEffect(() => {
@@ -96,8 +121,8 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
     
     setInstanceQuantityMap(newMap);
     
-    // If quantities exist, select the first region that has quantities configured
-    if (instanceQuantities.length > 0 && selectedRegions.length > 0) {
+    // Only set the initial region if user hasn't manually selected one yet
+    if (!userSelectedRegion.current && instanceQuantities.length > 0 && selectedRegions.length > 0) {
       // Find a region with configured quantities
       const regionsWithQuantities = new Set(
         instanceQuantities.map(item => item.region)
@@ -106,7 +131,7 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
       // Set the active region to the first region that has quantities
       const regionWithQuantities = selectedRegions.find(r => regionsWithQuantities.has(r));
       
-      if (regionWithQuantities && (!activeRegion || regionsWithQuantities.has(activeRegion))) {
+      if (regionWithQuantities && !activeRegion) {
         setActiveRegion(regionWithQuantities);
       }
     }
@@ -119,7 +144,7 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
     return instanceQuantityMap[key] || 1;
   };
 
-  // Apply quantities to all regions
+  // Apply quantities to all regions for a specific instance
   const applyToAllRegions = (instanceType: string, quantity: number) => {
     if (quantity <= 0) return;
     
@@ -136,19 +161,17 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
     setTimeout(() => actions.analyzeInstances(), 100);
   };
 
-  // Get total quantity for all instances
-  const getTotalQuantities = () => {
-    const totals: Record<string, number> = {};
+  // Apply current quantities to all regions for all instances
+  const applyAllToAllRegions = () => {
+    if (!activeRegion) return;
     
-    instanceQuantities.forEach(item => {
-      const instanceType = item.instanceType;
-      if (!totals[instanceType]) {
-        totals[instanceType] = 0;
-      }
-      totals[instanceType] += item.quantity;
+    selectedInstances.forEach(instanceType => {
+      const quantity = getQuantity(instanceType);
+      applyToAllRegions(instanceType, quantity);
     });
     
-    return totals;
+    // Trigger price recalculation after quantity change
+    setTimeout(() => actions.analyzeInstances(), 100);
   };
 
   // Show message if no instances or regions are selected
@@ -156,7 +179,6 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
     return null;
   }
   
-  const totalQuantities = getTotalQuantities();
   const hasQuantities = instanceQuantities.length > 0;
 
   return (
@@ -187,26 +209,24 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
         <CardContent className="pb-4">
           {hasQuantities ? (
             <div className="space-y-4">
-              <div className="border rounded-md p-3 bg-muted/20">
-                <h3 className="text-sm font-semibold mb-2">Instance Totals</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {Object.entries(totalQuantities).map(([instanceType, total]) => (
-                    <div key={instanceType} className="flex items-center gap-2 bg-background rounded-md p-2 shadow-sm">
-                      <span className="font-mono text-xs">{instanceType}:</span>
-                      <Badge variant="secondary" className="ml-auto">
-                        {total}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold">Region:</span>
                   <Select 
                     value={activeRegion} 
-                    onValueChange={(value: string) => setActiveRegion(value as RegionCode)}
+                    onValueChange={(value: string) => {
+                      userSelectedRegion.current = true; // Mark that user has selected a region
+                      setActiveRegion(value as RegionCode);
+                      // Force immediate update of the instance quantity map
+                      const newMap = { ...instanceQuantityMap };
+                      instanceQuantities.forEach(item => {
+                        if (item.region === value) {
+                          const key = `${item.instanceType}-${item.region}-${item.operatingSystem}`;
+                          newMap[key] = item.quantity;
+                        }
+                      });
+                      setInstanceQuantityMap(newMap);
+                    }}
                   >
                     <SelectTrigger className="w-[250px]">
                       <SelectValue placeholder="Select region..." />
@@ -224,9 +244,36 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
                   <span className="font-semibold">OS:</span>
                   <OSSelector 
                     activeOS={activeOS} 
-                    onChange={(os) => setActiveOS(os === 'Both' ? 'Linux' : os)} 
+                    onChange={(os) => {
+                      const newOS = os === 'Both' ? 'Linux' : os;
+                      setActiveOS(newOS);
+                      
+                      // Force immediate update of the instance quantity map for the new OS
+                      if (activeRegion) {
+                        const newMap = { ...instanceQuantityMap };
+                        instanceQuantities.forEach(item => {
+                          if (item.region === activeRegion && item.operatingSystem === newOS) {
+                            const key = `${item.instanceType}-${item.region}-${item.operatingSystem}`;
+                            newMap[key] = item.quantity;
+                          }
+                        });
+                        setInstanceQuantityMap(newMap);
+                      }
+                    }} 
                   />
                 </div>
+              </div>
+              
+              {/* Global Apply to All Regions button */}
+              <div className="flex justify-center my-4">
+                <Button
+                  variant="default"
+                  className="w-full max-w-md"
+                  onClick={applyAllToAllRegions}
+                  disabled={!activeRegion || selectedInstances.length === 0}
+                >
+                  Apply All Instances to All Regions
+                </Button>
               </div>
 
               {/* Instance Quantity Table */}
@@ -269,7 +316,7 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
                 </TableBody>
               </Table>
               
-              <div className="flex justify-end">
+              <div className="flex justify-center">
                 <Button
                   variant="outline" 
                   size="sm"
@@ -278,6 +325,7 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
                     setTimeout(() => actions.analyzeInstances(), 100);
                   }}
                   disabled={!hasQuantities}
+                  className="mx-auto"
                 >
                   Clear All Quantities
                 </Button>
