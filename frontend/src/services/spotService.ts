@@ -108,7 +108,7 @@ export class SpotService {
   private getDefaultMetrics(): SpotMetrics {
     return {
       s: 0,  // 0% savings
-      r: 0,  // Highest risk
+      r: 4,  // Highest risk (4 = Very High Risk)
       interruptionFrequency: 'Not Available'
     };
   }
@@ -174,9 +174,15 @@ export class SpotService {
       return 'Not Available';
     }
 
-    // Find the range with matching index
-    const range = this.spotData.ranges.find(r => r.index === rating);
-    return range?.label || 'Not Available';
+    // Map risk rating to interruption frequency
+    switch (rating) {
+      case 0: return '<5%';
+      case 1: return '5-10%';
+      case 2: return '10-15%';
+      case 3: return '15-20%';
+      case 4: return '>20%';
+      default: return 'Not Available';
+    }
   }
 
   public async analyzeInstances(

@@ -26,11 +26,11 @@ export function StackAnalysisVisual({ stackAnalysis, regionAnalysis, selectedOS 
 
   const getRiskColor = (score: number | null): string => {
     if (score === null) return '#94a3b8'; // gray for no data
-    if (score <= 0.5) return '#22c55e'; // very low - green
-    if (score <= 1.5) return '#4ade80'; // low - light green
-    if (score <= 2.5) return '#facc15'; // medium - yellow
-    if (score <= 3.5) return '#f97316'; // high - orange
-    return '#ef4444'; // very high - red
+    if (score >= 3.5) return '#ef4444';   // very high - red
+    if (score >= 2.5) return '#f97316';   // high - orange
+    if (score >= 1.5) return '#facc15';   // medium - yellow
+    if (score >= 0.5) return '#4ade80';   // low - light green
+    return '#22c55e';                     // very low - green
   };
 
   // Prepare data for region comparison based on OS selection
@@ -124,11 +124,11 @@ export function StackAnalysisVisual({ stackAnalysis, regionAnalysis, selectedOS 
 
   const getRiskLabel = (score: number | null): string => {
     if (score === null) return 'No Data';
-    if (score >= 3.5) return 'Very High';
-    if (score >= 2.5) return 'High';
-    if (score >= 1.5) return 'Medium';
-    if (score >= 0.5) return 'Low';
-    return 'Very Low';
+    if (score >= 3.5) return 'Very High';  // Risk score 3.5-4 should be Very High Risk
+    if (score >= 2.5) return 'High';       // Risk score 2.5-3.5 should be High Risk
+    if (score >= 1.5) return 'Medium';     // Risk score 1.5-2.5 should be Medium Risk
+    if (score >= 0.5) return 'Low';        // Risk score 0.5-1.5 should be Low Risk
+    return 'Very Low';                     // Risk score 0-0.5 should be Very Low Risk
   };
 
   return (

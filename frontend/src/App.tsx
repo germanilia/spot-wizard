@@ -4,15 +4,17 @@ import { RegionSelector } from './components/RegionSelector';
 import { InstanceSelector } from './components/InstanceSelector';
 import { InstanceAnalysis } from './components/InstanceAnalysis';
 import { AWSIntegration } from './components/AWSIntegration';
+import { JsonImportInput } from './components/JsonImportInput';
 import { actions } from './store/spotStore';
 import { useSnapshot } from 'valtio';
 import { spotStore } from './store/spotStore';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OSSelector } from './components/OSSelector';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertCircle, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InstanceQuantityManager } from './components/InstanceQuantityManager';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 type ViewType = 'instance' | 'region' | 'stack';
 
@@ -64,9 +66,10 @@ function App() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-4">
           {/* Tabs */}
           <Tabs defaultValue="manual" onValueChange={setActiveTab} value={activeTab}>
-            <TabsList className="w-full grid grid-cols-2 rounded-lg">
+            <TabsList className="w-full grid grid-cols-3 rounded-lg">
               <TabsTrigger value="manual" className="py-3">Manual Selection</TabsTrigger>
               <TabsTrigger value="aws" className="py-3">AWS Import</TabsTrigger>
+              <TabsTrigger value="calculator" className="py-3">Calculator Import</TabsTrigger>
             </TabsList>
             
             <TabsContent value="manual" className="space-y-4 mt-6">
@@ -106,6 +109,54 @@ function App() {
             
             <TabsContent value="aws" className="mt-6">
               <AWSIntegration />
+            </TabsContent>
+
+            <TabsContent value="calculator" className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <JsonImportInput onImportComplete={handleAnalyze} />
+                </div>
+                <div>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Calculator Import</CardTitle>
+                      <CardDescription>
+                        Import your EC2 instances from an AWS Pricing Calculator JSON file.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p>
+                        Upload a JSON file exported from the AWS Pricing Calculator to import your EC2 instances.
+                        We'll analyze them for potential cost savings with spot instances.
+                      </p>
+                      <p>
+                        The file should be in the format exported by the AWS Pricing Calculator.
+                        We'll extract the instance types, regions, and quantities automatically.
+                      </p>
+                      
+                      {spotStore.error && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{spotStore.error}</AlertDescription>
+                        </Alert>
+                      )}
+                      
+                      {selectedInstances.length > 0 && selectedRegions.length > 0 && (
+                        <div className="pt-4">
+                          <Button 
+                            onClick={handleAnalyze} 
+                            disabled={spotStore.isLoading}
+                            className="w-full"
+                          >
+                            {spotStore.isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {spotStore.isLoading ? 'Analyzing...' : 'Analyze Selected Instances'}
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
 

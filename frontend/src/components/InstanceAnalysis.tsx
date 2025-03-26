@@ -13,14 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { StackAnalysisVisual } from '@/components/StackAnalysisVisual';
 import { Loader2 } from 'lucide-react';
-import { InstanceSelector } from './InstanceSelector';
-import { RegionSelector } from './RegionSelector';
-import { InstanceQuantityManager } from './InstanceQuantityManager';
-import { OSSelector } from './OSSelector';
-import { Button } from '@/components/ui/button';
 import { actions } from '../store/spotStore';
 
-const ratingLabels = ['Very High Risk', 'High Risk', 'Medium Risk', 'Low Risk', 'Very Low Risk'];
+// Order from lowest risk (0) to highest risk (4)
+const ratingLabels = ['Very Low Risk', 'Low Risk', 'Medium Risk', 'High Risk', 'Very High Risk'];
 
 function MetricTooltip({ children }: { children: React.ReactNode }) {
   return (
