@@ -6,12 +6,12 @@ import httpx
 import asyncio
 import logging
 import sys
-from app.models.spot import SpotData, InstanceSpotData, RegionSpotData
-from app.services.cache_service import CacheService
+from .models.spot import SpotData, InstanceSpotData, RegionSpotData
+from .services.cache_service import CacheService
 from .api.pricing import router as pricing_router
 from .api.aws import router as aws_router
 from .scripts.init_data import init_data
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 import json
 from typing import AsyncGenerator
 
@@ -35,14 +35,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Only mount static files in production
-static_path = Path(__file__).parent.parent / "frontend" / "dist"
-if static_path.exists():
-    app.mount("/", StaticFiles(directory=str(static_path), html=True), name="static")
-
-# Include routers
+# Include routers first
 app.include_router(pricing_router, prefix="/api")
 app.include_router(aws_router, prefix="/api/aws")
+
+# Mount static files last, after all API routes
+static_path = Path("/app/static")
+if static_path.exists():
+    # Mount static files at /static instead of root
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+    
+    # Serve index.html for the root path
+    @app.get("/")
+    async def read_root():
+        return FileResponse(str(static_path / "index.html"))
 
 @app.on_event("startup")
 async def startup_event():

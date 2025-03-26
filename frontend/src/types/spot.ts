@@ -157,7 +157,7 @@ export interface SpotAdvisorData {
     };
   };
   instance_types: {
-    [instanceType: string]: InstanceSpecs;
+    [instanceType: string]: InstanceType;
   };
 }
 

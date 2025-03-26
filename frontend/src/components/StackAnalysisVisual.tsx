@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { StackAnalysis, RegionAnalysis } from '@/types/spot';
 import { formatRegionName } from '@/lib/utils';
@@ -7,7 +7,6 @@ import { Tooltip as RechartsTooltip } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InfoCircledIcon } from '@radix-ui/react-icons';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 interface StackAnalysisVisualProps {
@@ -16,12 +15,8 @@ interface StackAnalysisVisualProps {
   selectedOS: 'both' | 'linux' | 'windows';
 }
 
-interface RegionRiskData {
-  riskScore: number | null;
-  region: string;
-}
 
-export function StackAnalysisVisual({ stackAnalysis, regionAnalysis, selectedOS }: StackAnalysisVisualProps) {
+export function StackAnalysisVisual({ regionAnalysis, selectedOS }: StackAnalysisVisualProps) {
   const [selectedView, setSelectedView] = useState<'savings' | 'risk' | 'combined' | 'regions'>('savings');
 
   const getRiskColor = (score: number | null): string => {

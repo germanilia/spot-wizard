@@ -1,5 +1,5 @@
-from typing import Dict, List, Optional
-from pydantic import BaseModel, RootModel
+from typing import Dict, List, Optional, Annotated
+from pydantic import BaseModel, TypeAdapter
 
 
 class InstanceType(BaseModel):
@@ -25,8 +25,7 @@ class InstanceSpotData(BaseModel):
     Windows: Optional[Dict[str, SpotMetrics]] = None
 
 
-class RegionSpotData(RootModel):
-    root: Dict[str, InstanceSpotData]
+RegionSpotData = TypeAdapter(Dict[str, InstanceSpotData])
 
 
 class SpotData(BaseModel):

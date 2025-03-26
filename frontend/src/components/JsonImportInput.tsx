@@ -1,7 +1,5 @@
-import { useSnapshot } from 'valtio';
 import { useState } from 'react';
-import { awsStore } from '../store/awsStore';
-import { spotStore, actions } from '../store/spotStore';
+import { actions } from '../store/spotStore';
 import { Button } from './ui/button';
 import {
   Card,
@@ -12,17 +10,16 @@ import {
   CardTitle,
 } from './ui/card';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { AlertCircle, CheckCircle2, Loader2, Upload } from 'lucide-react';
+import { CheckCircle2, Loader2, Upload } from 'lucide-react';
 import { RegionCode } from '../types/spot';
 import { awsService } from '../services/awsService';
+import { toast } from '@/hooks/use-toast';
 
 interface JsonImportInputProps {
   onImportComplete?: () => void;
 }
 
 export function JsonImportInput({ onImportComplete }: JsonImportInputProps) {
-  const awsState = useSnapshot(awsStore);
-  const spotState = useSnapshot(spotStore);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -47,7 +44,6 @@ export function JsonImportInput({ onImportComplete }: JsonImportInputProps) {
               'US West (Oregon)': 'us-west-2',
               'US East (N. Virginia)': 'us-east-1',
               'US East (Ohio)': 'us-east-2',
-              'US West (N. California)': 'us-west-1',
               'US West (N. California)': 'us-west-1',
               'Asia Pacific (Tokyo)': 'ap-northeast-1',
               'Asia Pacific (Seoul)': 'ap-northeast-2',
@@ -87,7 +83,7 @@ export function JsonImportInput({ onImportComplete }: JsonImportInputProps) {
               actions.updateInstanceQuantity(
                 instance.instance_type,
                 region as RegionCode,
-                instance.platform,
+                instance.platform as 'Linux' | 'Windows',
                 instance.quantity
               );
             });

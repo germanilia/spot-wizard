@@ -1,9 +1,8 @@
-import { SpotData, InstanceAnalysis, InstanceSpotData, RegionAnalysis, StackAnalysis, InstanceCost, PricingConfig, SpotMetrics, RegionCode, InstanceQuantityConfig } from '../types/spot';
+import { SpotData, InstanceAnalysis, RegionAnalysis, StackAnalysis, InstanceCost, PricingConfig, SpotMetrics, RegionCode } from '../types/spot';
 import { PricingService } from './pricingService';
-import { getSpotAdvisorCode, isValidRegionCode } from '@/lib/regionMapping';
+import { isValidRegionCode } from '@/lib/regionMapping';
 import { spotStore } from '../store/spotStore';
 
-const SPOT_DATA_URL = 'https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json';
 
 export class SpotService {
   private static instance: SpotService;
@@ -169,7 +168,7 @@ export class SpotService {
     return result;
   }
 
-  private getInterruptionFrequency(rating: number, os: 'Linux' | 'Windows'): string {
+  private getInterruptionFrequency(rating: number): string {
     if (!this.spotData) {
       return 'Not Available';
     }
@@ -307,7 +306,7 @@ export class SpotService {
           if (linuxMetrics) {
             metrics = {
               ...linuxMetrics,
-              interruptionFrequency: this.getInterruptionFrequency(linuxMetrics.r, 'Linux')
+              interruptionFrequency: this.getInterruptionFrequency(linuxMetrics.r)
             };
           } else {
             metrics = this.getDefaultMetrics();
@@ -318,7 +317,7 @@ export class SpotService {
           if (windowsMetrics) {
             windowsMetricsWithFrequency = {
               ...windowsMetrics,
-              interruptionFrequency: this.getInterruptionFrequency(windowsMetrics.r, 'Windows')
+              interruptionFrequency: this.getInterruptionFrequency(windowsMetrics.r)
             };
           }
 

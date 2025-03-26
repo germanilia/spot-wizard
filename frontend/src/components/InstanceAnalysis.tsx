@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSnapshot } from 'valtio';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { spotStore } from '../store/spotStore';
-import { InstanceAnalysis as InstanceAnalysisType, RegionAnalysis, StackAnalysis, InstanceCost } from '../types/spot';
+import { InstanceAnalysis as InstanceAnalysisType, RegionAnalysis, StackAnalysis } from '../types/spot';
 import { formatRegionName } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { InfoCircledIcon } from '@radix-ui/react-icons';
@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { StackAnalysisVisual } from '@/components/StackAnalysisVisual';
 import { Loader2 } from 'lucide-react';
-import { actions } from '../store/spotStore';
 
 // Order from lowest risk (0) to highest risk (4)
 const ratingLabels = ['Very Low Risk', 'Low Risk', 'Medium Risk', 'High Risk', 'Very High Risk'];
@@ -33,53 +32,8 @@ function MetricTooltip({ children }: { children: React.ReactNode }) {
   );
 }
 
-interface CostDisplayProps {
-  cost: InstanceCost;
-  windowsCost?: InstanceCost;
-  isWindows?: boolean;
-}
-
-const CostDisplay: React.FC<CostDisplayProps> = ({ cost, windowsCost, isWindows = false }) => {
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">{isWindows ? 'Windows:' : 'Linux:'}</span>
-        <div className="flex items-center gap-1">
-          <span className="text-sm text-gray-600">
-            {cost.onDemand.toFixed(3)} {cost.currency}/{cost.unit}
-          </span>
-          <span className="text-xs text-gray-400">→</span>
-          <span className="text-sm text-green-600">
-            {cost.spot.toFixed(3)} {cost.currency}/{cost.unit}
-          </span>
-          <span className="text-xs text-green-600 ml-1">
-            (-{((cost.savings / cost.onDemand) * 100).toFixed(1)}%)
-          </span>
-        </div>
-      </div>
-      {!isWindows && windowsCost && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Windows:</span>
-          <div className="flex items-center gap-1">
-            <span className="text-sm text-gray-600">
-              {windowsCost.onDemand.toFixed(3)} {windowsCost.currency}/{windowsCost.unit}
-            </span>
-            <span className="text-xs text-gray-400">→</span>
-            <span className="text-sm text-green-600">
-              {windowsCost.spot.toFixed(3)} {windowsCost.currency}/{windowsCost.unit}
-            </span>
-            <span className="text-xs text-green-600 ml-1">
-              (-{((windowsCost.savings / windowsCost.onDemand) * 100).toFixed(1)}%)
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-function RegionComparisonTable({ analysis, selectedOS = 'both' }: { 
-  analysis: InstanceAnalysisType; 
+function RegionComparisonTable({ analysis, selectedOS = 'both' }: {
+  analysis: InstanceAnalysisType;
   selectedOS?: 'both' | 'linux' | 'windows';
 }) {
   const sortedMetrics = [...analysis.spotMetrics].sort((a, b) => {
@@ -118,7 +72,7 @@ function RegionComparisonTable({ analysis, selectedOS = 'both' }: {
           // If windowsMetrics is undefined, it means Windows is not selected or not available
           const showLinux = shouldShowLinux && metrics !== undefined && metrics !== windowsMetrics;
           const showWindows = shouldShowWindows && windowsMetrics !== undefined;
-          
+
           if (!showLinux && !showWindows) return null;
 
           return (
@@ -420,162 +374,6 @@ function StackAnalysisView({ analysis, selectedOS }: { analysis: readonly StackA
   return <StackAnalysisVisual stackAnalysis={analysis} regionAnalysis={regionAnalysis} selectedOS={selectedOS} />;
 }
 
-function InstanceCard({ analysis }: { analysis: InstanceAnalysisType }) {
-  const hasSpotMetrics = analysis.spotMetrics.length > 0;
-  const unavailableRegions = analysis.totalRegionsCount - analysis.availableRegionsCount;
-  const [selectedOS, setSelectedOS] = useState<'both' | 'linux' | 'windows'>('both');
-
-  // Calculate average savings for each OS
-  const averageSavings = {
-    linux: analysis.averageScore,
-    windows: analysis.spotMetrics.reduce((acc, metric) => 
-      metric.windowsMetrics ? acc + metric.windowsMetrics.s : acc, 0) / 
-      analysis.spotMetrics.filter(m => m.windowsMetrics).length || 0
-  };
-
-  const shouldShowWindows = selectedOS === 'both' || selectedOS === 'windows';
-  const shouldShowLinux = selectedOS === 'both' || selectedOS === 'linux';
-
-  return (
-    <Card className="w-full">
-      <CardHeader className="space-y-3">
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{analysis.instanceType}</span>
-            {analysis.specs.emr && (
-              <Badge variant="outline" className="text-xs">
-                EMR Compatible
-              </Badge>
-            )}
-          </div>
-          <Select value={selectedOS} onValueChange={(value: 'both' | 'linux' | 'windows') => setSelectedOS(value)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Select OS" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="both">Both OS</SelectItem>
-              <SelectItem value="linux">Linux Only</SelectItem>
-              <SelectItem value="windows">Windows Only</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardTitle>
-        {unavailableRegions > 0 && (
-          <Badge variant="secondary" className="w-fit">
-            Available in {analysis.availableRegionsCount} of {analysis.totalRegionsCount} regions
-          </Badge>
-        )}
-        <CardDescription>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2 min-w-[120px]">
-              <span className="font-medium text-foreground">CPU:</span>
-              <span>{analysis.specs.cores} vCPU{analysis.specs.cores > 1 ? 's' : ''}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-foreground">Memory:</span>
-              <span>{analysis.specs.ram_gb} GB</span>
-            </div>
-          </div>
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {!hasSpotMetrics ? (
-          <Alert>
-            <AlertDescription>
-              No spot metrics available for this instance type in the selected regions.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <>
-            <div className="space-y-4 mb-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">Average Savings over On-Demand</span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <InfoCircledIcon className="h-4 w-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <span>Average percentage savings compared to on-demand pricing across selected regions</span>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  {shouldShowLinux && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Linux:</span>
-                      <span className="font-bold text-lg text-green-600">{averageSavings.linux.toFixed(1)}%</span>
-                    </div>
-                  )}
-                  {shouldShowWindows && averageSavings.windows > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Windows:</span>
-                      <span className="font-bold text-lg text-green-600">{averageSavings.windows.toFixed(1)}%</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">Typical Interruption Frequency</span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <InfoCircledIcon className="h-4 w-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <span>Most common frequency of spot instance interruptions across selected regions</span>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  {shouldShowLinux && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Linux:</span>
-                      <span className="font-bold">
-                        {analysis.spotMetrics[0]?.metrics.interruptionFrequency ?? 'Unknown'}
-                      </span>
-                    </div>
-                  )}
-                  {shouldShowWindows && analysis.spotMetrics[0]?.windowsMetrics && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Windows:</span>
-                      <span className="font-bold">
-                        {analysis.spotMetrics[0]?.windowsMetrics?.interruptionFrequency ?? 'Unknown'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <RegionComparisonTable 
-                analysis={{
-                  ...analysis,
-                  spotMetrics: analysis.spotMetrics.map(metric => ({
-                    ...metric,
-                    windowsMetrics: shouldShowWindows ? metric.windowsMetrics : undefined,
-                    windowsCost: shouldShowWindows ? metric.windowsCost : undefined,
-                    metrics: shouldShowLinux ? metric.metrics : metric.windowsMetrics!
-                  })).filter(metric => 
-                    (shouldShowLinux && metric.metrics) || 
-                    (shouldShowWindows && metric.windowsMetrics)
-                  )
-                }} 
-                selectedOS={selectedOS}
-              />
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 type ViewType = 'instance' | 'region' | 'stack';
 
 interface InstanceAnalysisProps {
@@ -584,17 +382,15 @@ interface InstanceAnalysisProps {
   selectedOS?: 'both' | 'linux' | 'windows';
 }
 
-export function InstanceAnalysis({ 
-  hideSelectors = false, 
-  selectedView: propSelectedView, 
-  selectedOS: propSelectedOS 
+export function InstanceAnalysis({
+  selectedView: propSelectedView,
+  selectedOS: propSelectedOS
 }: InstanceAnalysisProps) {
   const snap = useSnapshot(spotStore);
   const { selectedInstances, isLoading, error, regionAnalysis, stackAnalysis } = snap;
   const analysis = snap.analysis;
   const [localSelectedView, setLocalSelectedView] = useState<ViewType>(propSelectedView || 'instance');
   const [localSelectedOS, setLocalSelectedOS] = useState<'both' | 'linux' | 'windows'>(propSelectedOS || 'both');
-  const { selectedRegions } = snap;
   const [forceRender, setForceRender] = useState(0);
 
   // Use props if provided, otherwise use local state
@@ -614,21 +410,6 @@ export function InstanceAnalysis({
     }
   }, [propSelectedOS]);
 
-  // Function to trigger analysis and ensure UI updates
-  const handleAnalysis = async () => {
-    console.log("Running analysis directly...");
-    try {
-      setForceRender(prev => prev + 1);
-      await actions.analyzeInstances();
-      // Force another re-render after analysis is complete
-      setTimeout(() => {
-        setForceRender(prev => prev + 1);
-        console.log("Forced re-render after analysis");
-      }, 100);
-    } catch (error) {
-      console.error("Error running analysis:", error);
-    }
-  };
 
   // Force re-render when analysis updates
   useEffect(() => {
@@ -639,11 +420,11 @@ export function InstanceAnalysis({
   }, [analysis]);
 
   const renderContent = () => {
-    console.log("Rendering content with state:", { 
-      isLoading, 
-      error, 
+    console.log("Rendering content with state:", {
+      isLoading,
+      error,
       selectedInstances: selectedInstances.length,
-      analysisLength: analysis?.length, 
+      analysisLength: analysis?.length,
       hasResults: analysis?.length > 0,
       forceRender,
       firstInstanceType: analysis?.[0]?.instanceType
@@ -802,7 +583,7 @@ export function InstanceAnalysis({
           </div>
         </div>
       )}
-      
+
       {/* Main content */}
       <div className="space-y-6">
         {renderContent()}
