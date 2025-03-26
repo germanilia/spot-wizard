@@ -837,7 +837,7 @@ export function InstanceAnalysis() {
       <div className="flex-1 overflow-auto">
         <div className="container mx-auto py-6 space-y-6">
           {/* Instance Quantity Manager */}
-          <InstanceQuantityManager className="sticky top-[5.5rem] z-10" />
+          <InstanceQuantityManager className="mb-4" />
           
           {renderContent()}
         </div>

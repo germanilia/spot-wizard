@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSnapshot } from 'valtio';
 import { spotStore, actions } from '../store/spotStore';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -34,9 +34,6 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
   useEffect(() => {
     if (selectedInstances.length === 0 || selectedRegions.length === 0) return;
     
-    console.log('Initializing quantities for instances:', selectedInstances);
-    console.log('Regions:', selectedRegions);
-    
     // Only initialize instances that don't have quantity set yet
     const operatingSystems: ('Linux' | 'Windows')[] = ['Linux', 'Windows'];
     
@@ -68,6 +65,9 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
       ...instanceQuantityMap,
       [`${instanceType}-${activeRegion}-${activeOS}`]: quantity
     });
+    
+    // Trigger price recalculation after quantity change
+    setTimeout(() => actions.analyzeInstances(), 100);
   };
 
   // Initialize quantity map from store
@@ -99,73 +99,52 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
         quantity
       );
     });
+    
+    // Trigger price recalculation after quantity change
+    setTimeout(() => actions.analyzeInstances(), 100);
   };
 
   // Show message if no instances or regions are selected
   if (selectedInstances.length === 0 || selectedRegions.length === 0) {
-    return (
-      <Card className={`w-full shadow-md ${className || ''}`}>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-xl font-semibold text-primary">Configure Instance Quantities</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-muted/40 rounded-lg p-6 text-center">
-            <p className="text-muted-foreground">
-              Please select at least one instance type and region above to configure quantities.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   return (
-    <Card className={`w-full shadow-md ${className || ''}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="flex items-center gap-1"
-              aria-label={isCollapsed ? "Expand quantity manager" : "Collapse quantity manager"}
-            >
-              {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-              {isCollapsed ? "Configure Quantities" : "Collapse"}
-            </Button>
-            {!isCollapsed && (
-              <CardTitle className="text-xl font-semibold text-primary">Instance Type | Region | OS | Quantity</CardTitle>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            {isCollapsed && instanceQuantities.length > 0 && (
-              <Badge variant="outline" className="mr-2">
-                {instanceQuantities.length} quantities configured
-              </Badge>
-            )}
-            {!isCollapsed && (
-              <OSSelector 
-                activeOS={activeOS === 'Linux' ? 'Linux' : 'Windows'} 
-                onChange={(os) => setActiveOS(os === 'Both' ? 'Linux' : os)} 
-              />
-            )}
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => actions.clearInstanceQuantities()}
-              disabled={instanceQuantities.length === 0}
-            >
-              Clear All
-            </Button>
-          </div>
+    <Card className={`${className || ''} shadow-none border-0 bg-transparent`}>
+      <div className="flex items-center justify-between mb-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex items-center gap-1 relative"
+        >
+          {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          <span>Configure Quantities</span>
+        </Button>
+        <div className="flex items-center gap-3">
+          {instanceQuantities.length > 0 && (
+            <Badge variant="outline" className="bg-muted">
+              {instanceQuantities.length} quantities configured
+            </Badge>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              actions.clearInstanceQuantities();
+              // Trigger price recalculation after clearing quantities
+              setTimeout(() => actions.analyzeInstances(), 100);
+            }}
+            disabled={instanceQuantities.length === 0}
+          >
+            Clear All
+          </Button>
         </div>
-      </CardHeader>
+      </div>
+      
       {!isCollapsed && (
-        <CardContent>
-          <div className="space-y-6">
-            {/* Region Selector */}
+        <CardContent className="pt-4 border rounded-md bg-background">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-semibold">Region:</span>
@@ -185,49 +164,51 @@ export function InstanceQuantityManager({ className }: InstanceQuantityManagerPr
                   </SelectContent>
                 </Select>
               </div>
+              <OSSelector 
+                activeOS={activeOS === 'Linux' ? 'Linux' : 'Windows'} 
+                onChange={(os) => setActiveOS(os === 'Both' ? 'Linux' : os)} 
+              />
             </div>
 
             {/* Instance Quantity Table */}
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Instance Type</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Instance Type</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedInstances.map((instanceType) => (
+                  <TableRow key={`${instanceType}-${activeRegion}-${activeOS}`}>
+                    <TableCell className="font-medium">{instanceType}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={getQuantity(instanceType)}
+                          onChange={(e) => updateInstanceQuantity(instanceType, parseInt(e.target.value) || 1)}
+                          min={1}
+                          className="w-24"
+                        />
+                        <span className="text-sm text-muted-foreground">in {activeRegion ? getRegionName(activeRegion as RegionCode) : ''}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => applyToAllRegions(instanceType, getQuantity(instanceType))}
+                        disabled={getQuantity(instanceType) < 1 || !activeRegion}
+                      >
+                        Apply to All Regions
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedInstances.map((instanceType) => (
-                    <TableRow key={`${instanceType}-${activeRegion}-${activeOS}`}>
-                      <TableCell className="font-medium">{instanceType}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            value={getQuantity(instanceType)}
-                            onChange={(e) => updateInstanceQuantity(instanceType, parseInt(e.target.value) || 1)}
-                            min={1}
-                            className="w-24"
-                          />
-                          <span className="text-sm text-muted-foreground">in {activeRegion ? getRegionName(activeRegion as RegionCode) : ''}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => applyToAllRegions(instanceType, getQuantity(instanceType))}
-                          disabled={getQuantity(instanceType) < 1 || !activeRegion}
-                        >
-                          Apply to All Regions
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       )}
