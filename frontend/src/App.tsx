@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OSSelector } from './components/OSSelector';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { InstanceQuantityManager } from './components/InstanceQuantityManager';
 
 type ViewType = 'instance' | 'region' | 'stack';
 
@@ -136,6 +137,11 @@ function App() {
                 Analyze Instances
               </Button>
             </div>
+          </div>
+          
+          {/* Instance Quantity Manager */}
+          <div className="mb-6">
+            <InstanceQuantityManager className="w-full" />
           </div>
         </div>
       </div>

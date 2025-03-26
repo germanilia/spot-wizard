@@ -58,17 +58,50 @@ export function AWSCredentialsInput({ onImportComplete }: AWSCredentialsInputPro
       // Set the instance types in the spot store
       actions.setSelectedInstances(Array.from(instanceTypes));
       
-      // Set the instance quantities
-      awsStore.instanceSummary.forEach(summary => {
-        const region = summary.region as RegionCode;
+      // Clear existing quantities before setting new ones
+      actions.clearInstanceQuantities();
+      
+      // First, group instances by region, type, and platform
+      const instanceCountByRegionTypeOS: Record<string, Record<string, Record<string, number>>> = {};
+      
+      // Process all instances and count them by region, type, and OS
+      Object.entries(awsStore.instances).forEach(([region, instances]) => {
+        instanceCountByRegionTypeOS[region] = {};
         
-        Object.entries(summary.instance_types).forEach(([instanceType, quantity]) => {
-          actions.updateInstanceQuantity(
-            instanceType,
-            region,
-            'Linux', // Default to Linux, can be enhanced with platform from the instance data
-            quantity
-          );
+        instances.forEach(instance => {
+          const instanceType = instance.instance_type;
+          const os = instance.platform === 'Windows' ? 'Windows' : 'Linux';
+          
+          if (!instanceCountByRegionTypeOS[region][instanceType]) {
+            instanceCountByRegionTypeOS[region][instanceType] = { 'Linux': 0, 'Windows': 0 };
+          }
+          
+          instanceCountByRegionTypeOS[region][instanceType][os]++;
+        });
+      });
+      
+      // Now set instance quantities based on actual OS
+      Object.entries(instanceCountByRegionTypeOS).forEach(([region, instanceTypes]) => {
+        Object.entries(instanceTypes).forEach(([instanceType, osCount]) => {
+          // Set Linux count
+          if (osCount['Linux'] > 0) {
+            actions.updateInstanceQuantity(
+              instanceType,
+              region as RegionCode,
+              'Linux',
+              osCount['Linux']
+            );
+          }
+          
+          // Set Windows count
+          if (osCount['Windows'] > 0) {
+            actions.updateInstanceQuantity(
+              instanceType,
+              region as RegionCode,
+              'Windows',
+              osCount['Windows']
+            );
+          }
         });
       });
       
