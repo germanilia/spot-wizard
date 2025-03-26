@@ -162,6 +162,8 @@ export const actions = {
   },
 
   updateInstanceQuantity(instanceType: string, region: RegionCode, operatingSystem: 'Linux' | 'Windows', quantity: number) {
+    console.log(`UPDATE QUANTITY: ${instanceType} in ${region} (${operatingSystem}) = ${quantity}`);
+    
     // Find if configuration already exists
     const existingIndex = spotStore.instanceQuantities.findIndex(
       item => item.instanceType === instanceType && 
@@ -169,6 +171,8 @@ export const actions = {
               item.operatingSystem === operatingSystem
     );
 
+    console.log(`Found existing config: ${existingIndex >= 0 ? 'YES' : 'NO'}`);
+    
     // Update existing or add new configuration
     if (existingIndex >= 0) {
       // Create a new array to trigger reactivity
@@ -177,18 +181,30 @@ export const actions = {
         ...newQuantities[existingIndex],
         quantity
       };
+      console.log(`Updating existing quantity: ${JSON.stringify(newQuantities[existingIndex])}`);
       spotStore.instanceQuantities = newQuantities;
     } else {
-      spotStore.instanceQuantities.push({
+      const newConfig = {
         instanceType,
         region,
         operatingSystem,
         quantity
-      });
+      };
+      console.log(`Adding new quantity config: ${JSON.stringify(newConfig)}`);
+      spotStore.instanceQuantities.push(newConfig);
+      
+      // Force reactivity by setting the entire array
+      spotStore.instanceQuantities = [...spotStore.instanceQuantities];
     }
+    
+    // Force reactivity in Valtio
+    setTimeout(() => {
+      console.log(`Current quantities after update: ${spotStore.instanceQuantities.length} configs`);
+    }, 50);
   },
 
   clearInstanceQuantities() {
+    console.log('Clearing all instance quantities');
     spotStore.instanceQuantities = [];
   },
 }; 

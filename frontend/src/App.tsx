@@ -17,7 +17,7 @@ import { InstanceQuantityManager } from './components/InstanceQuantityManager';
 type ViewType = 'instance' | 'region' | 'stack';
 
 function App() {
-  const { selectedInstances, selectedRegions } = useSnapshot(spotStore);
+  const { selectedInstances, selectedRegions, instanceQuantities } = useSnapshot(spotStore);
   const showError = selectedInstances.length === 0 || selectedRegions.length === 0;
   const [activeTab, setActiveTab] = useState<string>("manual");
   const [selectedOS, setSelectedOS] = useState<'Linux' | 'Windows' | 'Both'>('Linux');
@@ -109,6 +109,13 @@ function App() {
             </TabsContent>
           </Tabs>
 
+          {/* Instance Quantity Manager - Always visible when instances are available */}
+          {selectedInstances.length > 0 && selectedRegions.length > 0 && instanceQuantities.length > 0 && (
+            <div className="mt-6 mb-4">
+              <InstanceQuantityManager className="w-full" />
+            </div>
+          )}
+
           {/* Control bar with view selector, OS selector and Analyze button */}
           <div className="flex justify-between items-center gap-4 mt-6 mb-6 border-t pt-4">
             <div>
@@ -137,11 +144,6 @@ function App() {
                 Analyze Instances
               </Button>
             </div>
-          </div>
-          
-          {/* Instance Quantity Manager */}
-          <div className="mb-6">
-            <InstanceQuantityManager className="w-full" />
           </div>
         </div>
       </div>

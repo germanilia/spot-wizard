@@ -55,11 +55,18 @@ export function AWSCredentialsInput({ onImportComplete }: AWSCredentialsInputPro
         });
       });
       
-      // Set the instance types in the spot store
-      actions.setSelectedInstances(Array.from(instanceTypes));
+      const foundInstanceTypes = Array.from(instanceTypes);
+      console.log('Found instance types:', foundInstanceTypes);
       
       // Clear existing quantities before setting new ones
       actions.clearInstanceQuantities();
+      
+      // First set the selected regions in the spot store
+      const selectedRegions = awsState.credentials.regions as RegionCode[];
+      actions.setSelectedRegions(selectedRegions);
+      
+      // Then set the instance types in the spot store
+      actions.setSelectedInstances(foundInstanceTypes);
       
       // First, group instances by region, type, and platform
       const instanceCountByRegionTypeOS: Record<string, Record<string, Record<string, number>>> = {};
@@ -81,6 +88,8 @@ export function AWSCredentialsInput({ onImportComplete }: AWSCredentialsInputPro
       });
       
       // Now set instance quantities based on actual OS
+      let totalQuantitiesSet = 0;
+      
       Object.entries(instanceCountByRegionTypeOS).forEach(([region, instanceTypes]) => {
         Object.entries(instanceTypes).forEach(([instanceType, osCount]) => {
           // Set Linux count
@@ -91,6 +100,7 @@ export function AWSCredentialsInput({ onImportComplete }: AWSCredentialsInputPro
               'Linux',
               osCount['Linux']
             );
+            totalQuantitiesSet++;
           }
           
           // Set Windows count
@@ -101,9 +111,15 @@ export function AWSCredentialsInput({ onImportComplete }: AWSCredentialsInputPro
               'Windows',
               osCount['Windows']
             );
+            totalQuantitiesSet++;
           }
         });
       });
+      
+      console.log(`Set ${totalQuantitiesSet} quantity configurations across all regions and OSes`);
+      
+      // Force update the quantities in the store by setting them directly
+      spotStore.instanceQuantities = [...spotStore.instanceQuantities];
       
       // Run analysis if requested
       if (onImportComplete) {
