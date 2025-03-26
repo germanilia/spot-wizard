@@ -60,7 +60,7 @@ export class PricingService {
       return this.pricingData[cacheKey];
     }
 
-    if (this.fetchPromises[cacheKey]) {
+    if (cacheKey in this.fetchPromises) {
       return this.fetchPromises[cacheKey];
     }
 
@@ -107,9 +107,9 @@ export class PricingService {
         });
 
       return await this.fetchPromises[cacheKey];
-    } catch (error) {
+    } catch (error: unknown) {
       // Only log actual errors, not expected missing data
-      if (!error.message?.startsWith('NO_PRICING_DATA:')) {
+      if (error instanceof Error && !error.message.startsWith('NO_PRICING_DATA:')) {
         console.error('Error in fetchPricing:', error);
       }
       delete this.fetchPromises[cacheKey];

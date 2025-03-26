@@ -9,6 +9,7 @@ import sys
 from app.models.spot import SpotData, InstanceSpotData, RegionSpotData
 from app.services.cache_service import CacheService
 from .api.pricing import router as pricing_router
+from .api.aws import router as aws_router
 from .scripts.init_data import init_data
 from fastapi.responses import StreamingResponse
 import json
@@ -41,6 +42,7 @@ if static_path.exists():
 
 # Include routers
 app.include_router(pricing_router, prefix="/api")
+app.include_router(aws_router, prefix="/api/aws")
 
 @app.on_event("startup")
 async def startup_event():

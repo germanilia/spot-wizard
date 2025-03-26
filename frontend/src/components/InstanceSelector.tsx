@@ -17,6 +17,8 @@ import { useSnapshot } from "valtio";
 import { spotStore, actions } from "../store/spotStore";
 import { useState, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { formatInstanceSpecs } from "@/lib/utils";
+import { SpotService } from "../services/spotService";
 
 // Helper function to get instance family
 const getInstanceFamily = (instance: string): string => {
@@ -27,10 +29,19 @@ const getInstanceFamily = (instance: string): string => {
 export function InstanceSelector() {
   const [open, setOpen] = useState(false);
   const { instanceTypes, selectedInstances } = useSnapshot(spotStore);
+  const [searchValue, setSearchValue] = useState("");
+  const spotService = SpotService.getInstance();
+  const spotData = spotService.getSpotData();
 
-  // Group instances by family
+  // Group instances by family with filtering based on search
   const groupedInstances = useMemo(() => {
-    const groups = instanceTypes.reduce((acc, instance) => {
+    // Filter instances based on search value
+    const filteredInstances = instanceTypes.filter(instance => {
+      return instance.toLowerCase().includes(searchValue.toLowerCase());
+    });
+
+    // Group the filtered instances
+    const groups = filteredInstances.reduce((acc, instance) => {
       const family = getInstanceFamily(instance);
       if (!acc[family]) acc[family] = [];
       acc[family].push(instance);
@@ -44,7 +55,7 @@ export function InstanceSelector() {
 
     // Sort groups
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  }, [instanceTypes]);
+  }, [instanceTypes, searchValue]);
 
   const handleSelectAll = () => {
     actions.setSelectedInstances([...instanceTypes]);
@@ -122,7 +133,12 @@ export function InstanceSelector() {
             </PopoverTrigger>
             <PopoverContent className="w-[400px] p-0">
               <Command>
-                <CommandInput placeholder="Search instance types..." className="h-9" />
+                <CommandInput 
+                  placeholder="Search instance types..." 
+                  value={searchValue}
+                  onValueChange={setSearchValue}
+                  className="h-9" 
+                />
                 <CommandEmpty>No instance type found.</CommandEmpty>
                 <div className="max-h-[300px] overflow-y-auto">
                   {groupedInstances.map(([family, instances]) => (
@@ -142,26 +158,36 @@ export function InstanceSelector() {
                         />
                         <span className="font-medium">Select All {family}</span>
                       </CommandItem>
-                      {instances.map((instance) => (
-                        <CommandItem
-                          key={instance}
-                          value={instance}
-                          onSelect={() => {
-                            if (!selectedInstances.includes(instance)) {
-                              actions.setSelectedInstances([...selectedInstances, instance]);
-                            }
-                          }}
-                          className="flex items-center py-2 px-2 cursor-pointer hover:bg-accent"
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedInstances.includes(instance) ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          <span className="font-medium">{instance}</span>
-                        </CommandItem>
-                      ))}
+                      {instances.map((instance) => {
+                        const specs = spotData?.instance_types[instance];
+                        return (
+                          <CommandItem
+                            key={instance}
+                            value={instance}
+                            onSelect={() => {
+                              if (!selectedInstances.includes(instance)) {
+                                actions.setSelectedInstances([...selectedInstances, instance]);
+                              }
+                            }}
+                            className="flex items-center py-2 px-2 cursor-pointer hover:bg-accent"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedInstances.includes(instance) ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span className="font-medium">{instance}</span>
+                              {specs && (
+                                <span className="text-xs text-muted-foreground">
+                                  {formatInstanceSpecs(specs.cores, specs.ram_gb)}
+                                </span>
+                              )}
+                            </div>
+                          </CommandItem>
+                        );
+                      })}
                     </CommandGroup>
                   ))}
                 </div>
@@ -169,25 +195,35 @@ export function InstanceSelector() {
             </PopoverContent>
           </Popover>
           {selectedInstances.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {selectedInstances.map((instance: string) => (
-                <div
-                  key={instance}
-                  className="bg-primary/10 text-primary rounded-md px-2 py-1 text-sm flex items-center gap-2"
-                >
-                  <span>{instance}</span>
-                  <button
-                    onClick={() => {
-                      actions.setSelectedInstances(
-                        selectedInstances.filter((i) => i !== instance)
-                      );
-                    }}
-                    className="hover:text-destructive"
+            <div className="flex flex-wrap gap-2 max-h-[240px] overflow-y-auto">
+              {selectedInstances.map((instance) => {
+                const specs = spotData?.instance_types[instance];
+                return (
+                  <div
+                    key={instance}
+                    className="bg-primary/10 text-primary rounded-md px-2 py-1 text-sm flex items-center gap-2"
                   >
-                    ×
-                  </button>
-                </div>
-              ))}
+                    <div className="flex flex-col">
+                      <span>{instance}</span>
+                      {specs && (
+                        <span className="text-xs text-muted-foreground">
+                          {formatInstanceSpecs(specs.cores, specs.ram_gb)}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        actions.setSelectedInstances(
+                          selectedInstances.filter((i) => i !== instance)
+                        );
+                      }}
+                      className="hover:text-destructive"
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

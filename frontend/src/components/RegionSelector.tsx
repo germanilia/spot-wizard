@@ -25,7 +25,7 @@ const getRegionGroup = (regionCode: string): string => {
 };
 
 // Helper function to get all regions in a group
-const getRegionsInGroup = (regions: RegionCode[], group: string): RegionCode[] => {
+const getRegionsInGroup = (regions: readonly RegionCode[], group: string): RegionCode[] => {
   return regions.filter(region => getRegionGroup(region) === group);
 };
 

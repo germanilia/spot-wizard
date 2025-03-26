@@ -582,14 +582,41 @@ function InstanceCard({ analysis }: { analysis: InstanceAnalysisType }) {
 
 type ViewType = 'instance' | 'region' | 'stack';
 
-export function InstanceAnalysis() {
+interface InstanceAnalysisProps {
+  hideSelectors?: boolean;
+  selectedView?: ViewType;
+  selectedOS?: 'both' | 'linux' | 'windows';
+}
+
+export function InstanceAnalysis({ 
+  hideSelectors = false, 
+  selectedView: propSelectedView, 
+  selectedOS: propSelectedOS 
+}: InstanceAnalysisProps) {
   const snap = useSnapshot(spotStore);
   const { selectedInstances, isLoading, error, regionAnalysis, stackAnalysis } = snap;
   const analysis = snap.analysis;
-  const [selectedView, setSelectedView] = useState<ViewType>('instance');
-  const [selectedOS, setSelectedOS] = useState<'both' | 'linux' | 'windows'>('both');
+  const [localSelectedView, setLocalSelectedView] = useState<ViewType>(propSelectedView || 'instance');
+  const [localSelectedOS, setLocalSelectedOS] = useState<'both' | 'linux' | 'windows'>(propSelectedOS || 'both');
   const { selectedRegions } = snap;
   const [forceRender, setForceRender] = useState(0);
+
+  // Use props if provided, otherwise use local state
+  const selectedView = propSelectedView || localSelectedView;
+  const selectedOS = propSelectedOS || localSelectedOS;
+
+  // Update local state if props change
+  useEffect(() => {
+    if (propSelectedView) {
+      setLocalSelectedView(propSelectedView);
+    }
+  }, [propSelectedView]);
+
+  useEffect(() => {
+    if (propSelectedOS) {
+      setLocalSelectedOS(propSelectedOS);
+    }
+  }, [propSelectedOS]);
 
   // Function to trigger analysis and ensure UI updates
   const handleAnalysis = async () => {
@@ -761,86 +788,28 @@ export function InstanceAnalysis() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-50 bg-background border-b pb-6">
-        <div className="container mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <img 
-                src="/logo.svg" 
-                alt="Spot Wizard" 
-                className="w-12 h-12 md:w-16 md:h-16"
-                style={{ filter: 'drop-shadow(0 0 12px rgba(0, 0, 0, 0.15))' }}
-              />
-              <div>
-                <h1 className="text-2xl font-bold text-primary">Spot Wizard</h1>
-                <p className="text-sm text-muted-foreground">
-                  Analyze spot instance availability and ratings across regions
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Select value={selectedView} onValueChange={(value: ViewType) => setSelectedView(value)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select view" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="instance">Instance View</SelectItem>
-                  <SelectItem value="region">Region View</SelectItem>
-                  <SelectItem value="stack">Stack View</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Selection Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <InstanceSelector />
-            <RegionSelector />
-          </div>
-
-          {/* Analyze Button */}
-          <div className="flex items-center gap-4">
-            <Button 
-              onClick={handleAnalysis}
-              disabled={selectedInstances.length === 0 || selectedRegions.length === 0 || isLoading}
-              className="bg-primary hover:bg-primary/90"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                'Analyze Instances'
-              )}
-            </Button>
-            <OSSelector 
-              activeOS={selectedOS === 'both' ? 'Both' : selectedOS === 'linux' ? 'Linux' : 'Windows'} 
-              onChange={(os) => setSelectedOS(os === 'Both' ? 'both' : os.toLowerCase() as 'linux' | 'windows')} 
-            />
-            {(selectedInstances.length === 0 || selectedRegions.length === 0) && (
-              <Alert variant="destructive" className="flex-1 py-2 border-none bg-transparent">
-                <div className="flex items-center gap-2 text-destructive">
-                  <AlertDescription className="text-sm">
-                    Please select at least one instance type and region
-                  </AlertDescription>
-                </div>
-              </Alert>
-            )}
+    <div className="container mx-auto my-6">
+      {/* Only show view selector if props aren't provided */}
+      {!propSelectedView && (
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <Select value={localSelectedView} onValueChange={(value: ViewType) => setLocalSelectedView(value)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select view" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="instance">Instance View</SelectItem>
+                <SelectItem value="region">Region View</SelectItem>
+                <SelectItem value="stack">Stack View</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
-      </div>
-
-      {/* Scrollable Content */}
-      <div className="flex-1 overflow-auto">
-        <div className="container mx-auto py-6 space-y-6">
-          {/* Instance Quantity Manager */}
-          <InstanceQuantityManager className="mb-4" />
-          
-          {renderContent()}
-        </div>
+      )}
+      
+      {/* Main content */}
+      <div className="space-y-6">
+        {renderContent()}
       </div>
     </div>
   );
