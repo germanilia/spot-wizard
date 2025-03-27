@@ -35,20 +35,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers first
+# Define API routes first
+@app.get("/api/spot-data")
+async def get_spot_data():
+    try:
+        data = await fetch_spot_data()
+        
+        # Validate the data against our model
+        validated_data = SpotData(**data)
+        
+        # Return the validated data
+        return validated_data
+    except ValueError as e:
+        logger.error(f"Data validation error: {e}")
+        raise HTTPException(status_code=500, detail=f"Invalid data format: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error processing spot data: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing spot data: {str(e)}")
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+# Include routers
 app.include_router(pricing_router, prefix="/api")
 app.include_router(aws_router, prefix="/api/aws")
 
 # Mount static files last, after all API routes
 static_path = Path("/app/static")
 if static_path.exists():
-    # Mount static files at /static instead of root
-    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
-    
-    # Serve index.html for the root path
-    @app.get("/")
-    async def read_root():
-        return FileResponse(str(static_path / "index.html"))
+    # Mount static files at root
+    app.mount("/", StaticFiles(directory=str(static_path), html=True), name="static")
 
 @app.on_event("startup")
 async def startup_event():
@@ -56,10 +73,6 @@ async def startup_event():
     logger.info("Starting data initialization...")
     await init_data()
     logger.info("Data initialization complete")
-
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
 
 async def fetch_spot_data() -> dict:
     try:
@@ -101,21 +114,4 @@ async def fetch_spot_data() -> dict:
         raise HTTPException(status_code=503, detail=f"Failed to fetch spot data: {str(e)}")
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-
-@app.get("/api/spot-data")
-async def get_spot_data():
-    try:
-        data = await fetch_spot_data()
-        
-        # Validate the data against our model
-        validated_data = SpotData(**data)
-        
-        # Return the validated data
-        return validated_data
-    except ValueError as e:
-        logger.error(f"Data validation error: {e}")
-        raise HTTPException(status_code=500, detail=f"Invalid data format: {str(e)}")
-    except Exception as e:
-        logger.error(f"Error processing spot data: {e}")
-        raise HTTPException(status_code=500, detail=f"Error processing spot data: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}") 
