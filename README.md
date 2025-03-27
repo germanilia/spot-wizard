@@ -63,7 +63,7 @@ Or using Docker directly:
 docker build -t spot-wizard .
 
 # Run the container
-docker run -p 8000:8000 spot-wizard
+docker run --rm -it   -p 8000:8000   -v spot-wizard-cache:/app/data   spotwizard:latest production
 ```
 
 The application will be available at http://localhost:8000 when running in Docker.
