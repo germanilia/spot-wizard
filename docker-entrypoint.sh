@@ -5,7 +5,7 @@ set -e
 APP_ENV=${APP_ENV:-production}
 
 if [ "$APP_ENV" = "production" ]; then
-    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
 elif [ "$APP_ENV" = "development" ]; then
     exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 else

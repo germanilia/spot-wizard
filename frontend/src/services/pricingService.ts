@@ -40,8 +40,8 @@ export class PricingService {
   }
 
   private getPricingUrl(config: PricingConfig): string {
-    // During development, use the FastAPI server URL
-    const baseUrl = 'http://localhost:8000/api/pricing';
+    // Use a relative path for the API endpoint
+    const baseUrl = '/api/pricing'; 
     const params = new URLSearchParams({
       region: config.region,
       os: config.operatingSystem
@@ -144,4 +144,4 @@ export class PricingService {
     }
     return price;
   }
-} 
+}
